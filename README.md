@@ -22,3 +22,8 @@ UI Design: Justus B, Jan, Finn, Carsten
 Auf Windows:
 
 `py -m pip install -r requirements.txt`
+
+
+### Docs
+
+[python_gedcom_2 Docs](https://swanny0819.github.io/python-gedcom-2/python_gedcom_2/index.html)
