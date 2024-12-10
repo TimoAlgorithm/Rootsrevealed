@@ -31,14 +31,12 @@ class GedcomRecord:
         return f"Record ID: {self.record_id}\nType: {self.record_type}\nDetails:\n    {details_str}\n"
 
 
-
-
 def parse_gedcom(file_path):
     records = []
     current_record = None
     current_family = None
 
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open(gedcom_file_path, 'r', encoding='utf-8') as file:
         for line in file:
             parts = line.strip().split(" ", 2)
             if len(parts) < 2:
@@ -139,14 +137,12 @@ def parse_gedcom(file_path):
     return records
 
 
-
-
 # Path to the GEDCOM file
-gedcom_file_path = "The Kennedy Family.ged"  
-
+gedcom_file_path = r"The English and British Kings and Queens.ged"  # Use a raw string for Windows paths
+print(gedcom_file_path)
 # Parse the GEDCOM file
 parsed_records = parse_gedcom(gedcom_file_path)
 
-# Print only the first 5 records
-for record in parsed_records[:1000]:
+# Print the first 5 records
+for record in parsed_records:
     print(record)
