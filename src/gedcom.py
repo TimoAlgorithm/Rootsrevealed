@@ -142,7 +142,7 @@ def parse_gedcom(file_path):
 
 
 # Path to the GEDCOM file
-gedcom_file_path = "The Kennedy Family.ged"  # Replace with the actual file path
+gedcom_file_path = "The Kennedy Family.ged"  
 
 # Parse the GEDCOM file
 parsed_records = parse_gedcom(gedcom_file_path)
