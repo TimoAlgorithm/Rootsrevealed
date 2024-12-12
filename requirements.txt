@@ -1,2 +1,2 @@
-python-gedcom-2
 pillow
+pylint
