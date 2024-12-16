@@ -3,7 +3,6 @@ import re
 
 import python_gedcom_2
 import python_gedcom_2.tags
-from python_gedcom_2.element.element import Element
 
 
 class ElementCreator:
@@ -15,7 +14,7 @@ class ElementCreator:
 
     @classmethod
     def create_element(cls, level, pointer, tag, value, linebreak, is_multiline=True):
-
+        from python_gedcom_2.element.element import Element
         tag_element_dict = {
             python_gedcom_2.tags.GEDCOM_TAG_ADOPTION: "AdoptionElement",
             python_gedcom_2.tags.GEDCOM_TAG_ADULT_CHRISTENING: "AdultChristeningElement",
