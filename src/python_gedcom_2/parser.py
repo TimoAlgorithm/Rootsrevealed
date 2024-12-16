@@ -334,13 +334,13 @@ class Parser:
 
         return husband, wife
 
-    def get_natural_children(self, individual: IndividualElement) -> List[IndividualElement]:
+    def get_children(self, individual: IndividualElement) -> List[IndividualElement]:
         """
         Return a list of children of an individual that are directly related and not adopted.
         """
         if not isinstance(individual, IndividualElement):
             raise NotAnActualIndividualError(
-                "Operation only valid for elements with %s tag" % python_gedcom_2.tags.GEDCOM_TAG_INDIVIDUAL
+                f"Operation only valid for elements with {python_gedcom_2.tags.GEDCOM_TAG_INDIVIDUAL} tag"
             )
 
         children: List[IndividualElement] = []
@@ -349,7 +349,7 @@ class Parser:
         for family in families:
             for pointer in family.get_children_pointers():
                 child = self.get_element_by_pointer(pointer)
-                if not child.is_tag_present(python_gedcom_2.tags.GEDCOM_TAG_ADOPTION) and isinstance(child, IndividualElement):
+                if isinstance(child, IndividualElement):
                     children.append(child)
 
         return children
