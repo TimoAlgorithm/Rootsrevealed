@@ -132,11 +132,10 @@ class DisplayFrame(tk.Frame):
         elements = self.controller.parser.get_root_child_elements()
         eldest = [element for element in elements
                   if isinstance(element, IndividualElement) and not element.is_child_in_a_family()]
-        
-        self.canvas.bind('<Button-1>', self.object_click_event)
-        
+
+        self.last_clicked: str = ""
         self.objects: dict[int, str] = {}
-        
+
         if eldest:
             start_x = 1000
             start_y = 50
@@ -170,16 +169,15 @@ class DisplayFrame(tk.Frame):
         text = self.canvas.create_text(x, y + node_height / 2, text=person.get_name(), fill="#ffffff", font=self.font)
         self.objects[rect] = person.get_pointer()
         self.objects[text] = person.get_pointer()
-        
-        #self.canvas.tag_bind(rect, "<Button-1>", self.object_click_event)
-        #self.canvas.tag_bind(text, "<Button-1>", self.object_click_event)
-        print(person.get_pointer(), rect, text)
-        
+
+        self.canvas.tag_bind(rect, "<Button-1>", self.object_click_event)
+        self.canvas.tag_bind(text, "<Button-1>", self.object_click_event)
+
         children = self.controller.parser.get_children(person)
-        
+
         if not children:
             return
-        
+
         children_widths = [self.subtree_width(child) for child in children]
         total_children_width = sum(children_widths) + self.horizontal_gap * (len(children) - 1)
         child_top_y = y + node_height + self.vertical_gap
@@ -196,9 +194,17 @@ class DisplayFrame(tk.Frame):
             start_x += cw + self.horizontal_gap
 
     def object_click_event(self, event):
-        item = self.canvas.find
-        person = self.controller.parser.get_element_by_pointer(self.objects[event.num])
-        print(f"Clicked object {person} {type(person)} {person}")
+        closest = event.widget.find_closest(event.x, event.y)
+        if closest:
+            item_id = closest[0]
+            if item_id in self.objects:
+                pointer = self.objects[item_id]
+                if self.last_clicked == pointer:
+                    person = self.controller.parser.get_element_by_pointer(self.objects[event.num])
+                    print(f"Clicked object {person} {type(person)} {person}")
+                self.last_clicked = pointer
+            else:
+                print(f"Clicked on an unmapped canvas item: {item_id}")
 
 
 if __name__ == "__main__":
