@@ -3,7 +3,9 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 from python_gedcom_2.parser import Parser
 from python_gedcom_2.element.individual import IndividualElement
+import python_gedcom_2.tags as tags
 import tkinter.font as tkFont
+from python_gedcom_2.element.element import Element
 
 
 class MainWindow(tk.Tk):
@@ -132,6 +134,10 @@ class DisplayFrame(tk.Frame):
         elements = self.controller.parser.get_root_child_elements()
         eldest = [element for element in elements
                   if isinstance(element, IndividualElement) and not element.is_child_in_a_family()]
+
+        self.last_clicked: str = ""
+        self.objects: dict[int, str] = {}
+
         if eldest:
             start_x = 1000
             start_y = 50
@@ -161,11 +167,19 @@ class DisplayFrame(tk.Frame):
         y1 = y
         x2 = x + node_width / 2
         y2 = y + node_height
-        self.canvas.create_rectangle(x1, y1, x2, y2, fill="#7D625B", outline="#E9E4E1")
-        self.canvas.create_text(x, y + node_height / 2, text=person.get_name(), fill="#ffffff", font=self.font)
+        rect_id = self.canvas.create_rectangle(x1, y1, x2, y2, fill="#7D625B", outline="#E9E4E1")
+        text_id = self.canvas.create_text(x, y + node_height / 2, text=person.get_name(), fill="#ffffff", font=self.font)
+        self.objects[rect_id] = person.get_pointer()
+        self.objects[text_id] = person.get_pointer()
+
+        self.canvas.tag_bind(rect_id, "<Button-1>", lambda e, item_id=rect_id: self.object_click_event(e, item_id))
+        self.canvas.tag_bind(text_id, "<Button-1>", lambda e, item_id=text_id: self.object_click_event(e, item_id))
+
         children = self.controller.parser.get_children(person)
+
         if not children:
             return
+
         children_widths = [self.subtree_width(child) for child in children]
         total_children_width = sum(children_widths) + self.horizontal_gap * (len(children) - 1)
         child_top_y = y + node_height + self.vertical_gap
@@ -180,6 +194,71 @@ class DisplayFrame(tk.Frame):
             self.canvas.create_line(child_x, mid_y, child_x, child_y, fill="#A48164")
             self.draw_tree(child, child_x, child_y)
             start_x += cw + self.horizontal_gap
+
+    def object_click_event(self, event, item_id):
+        if item_id in self.objects:
+            pointer = self.objects[item_id]
+            person = self.controller.parser.get_element_by_pointer(pointer)
+            EditPopup(person, self.controller).mainloop()
+
+
+class EditPopup(tk.Tk):
+    def __init__(self, person: IndividualElement, controller: MainWindow):
+        super().__init__()
+        self.controller = controller
+        self.person = person
+
+        self.title("Daten ändern")
+        #self.geometry("400x280")
+        self.resizable(False, False)
+        self.configure(bg="#7A534D")  # Hintergrundfarbe
+
+        is_name_tag_present = person.is_tag_present(tags.GEDCOM_TAG_NAME)
+
+        self.given_name = person.get_name_as_tuple()[0] if is_name_tag_present else ""
+        self.nachname = person.get_name_as_tuple()[1] if is_name_tag_present else ""
+        self.geburtsdatum = person.get_birth_element().get_date_element().as_datetime() if person.get_birth_element() else ""
+        self.sterbedatum = person.get_death_element().get_date_element().as_datetime() if person.get_death_element() else ""
+
+        self.given_name_entry = self.create_label_entry("Name", 0, self.given_name)
+        self.nachname_entry = self.create_label_entry("Nachname", 1, self.nachname)
+        self.geburtsdatum_entry = self.create_label_entry("Geburtsdatum", 2, self.geburtsdatum)
+        self.sterbedatum_entry = self.create_label_entry("Sterbedatum", 3, self.sterbedatum)
+        
+        fertig_button = tk.Button(
+            self,
+            text="Fertig",
+            bg="#D5A77C",
+            fg="white",
+            font=("Helvetica", 12, "bold"),
+            relief="flat",
+            command=self.on_fertig_click
+        )
+        fertig_button.grid(row=4, column=0, columnspan=2, pady=20)
+
+        text = tk.Label(self, text=self.person.to_gedcom_string(True), anchor="w", justify="left")
+        text.grid(row=0, column=2, rowspan=5, padx=20, pady=10, sticky="nsew")
+
+    def create_label_entry(self, text, row, labeltext):
+        label = tk.Label(self, text=text, bg="#7A534D", fg="white", font=("Helvetica", 12, "bold"))
+        label.grid(row=row, column=0, padx=20, pady=10, sticky="w")
+        entry = tk.Entry(self, font=("Helvetica", 12), bg="#B38B82", fg="black", relief="flat")
+        entry.insert(0, labeltext)
+        entry.grid(row=row, column=1, padx=20, pady=10)
+        return entry
+
+    def on_fertig_click(self):
+        new_name = self.given_name_entry.get()
+        if new_name != self.given_name or self.nachname_entry.get() != self.nachname:
+            name_element: Element = self.person.get_child_element_by_tag(tags.GEDCOM_TAG_NAME)
+            name_element.get_child_element_by_tag(tags.GEDCOM_TAG_GIVEN_NAME).set_value(new_name)
+            name_element.get_child_element_by_tag(tags.GEDCOM_TAG_SURNAME).set_value(self.nachname_entry.get())
+            name_element.set_value(new_name + " /" + self.nachname_entry.get() + "/")
+
+        # TODO: events und andere sachen editieren
+
+        self.controller.show_frame(DisplayFrame)
+        self.destroy()
 
 
 if __name__ == "__main__":
