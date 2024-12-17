@@ -181,6 +181,60 @@ class DisplayFrame(tk.Frame):
             self.draw_tree(child, child_x, child_y)
             start_x += cw + self.horizontal_gap
 
+def popup_window(namei="", nachnamei="", geburtsdatumi="", sterbedatumi=""):
+
+    # Hauptfenster
+    popwin = tk.Tk()
+    popwin.title("Daten ändern")
+    popwin.geometry("400x280")
+    popwin.resizable(False, False)
+    popwin.configure(bg="#7A534D")  # Hintergrundfarbe 
+
+    name = ""
+    nachname = ""
+    geburtsdatum = ""
+    sterbedatum = ""
+
+    # Eingabefelder erstellen
+    def create_label_entry(popwin, text, row, labeltext):
+        label = tk.Label(popwin, text=text, bg="#7A534D", fg="white", font=("Helvetica", 12, "bold"))
+        label.grid(row=row, column=0, padx=20, pady=10, sticky="w")
+        entry = tk.Entry(popwin, font=("Helvetica", 12), bg="#B38B82", fg="black", relief="flat")
+        entry.insert(0, labeltext)
+        entry.grid(row=row, column=1, padx=20, pady=10)
+        return entry
+
+    # Eingabefelder hinzufügen
+    name_entry = create_label_entry(popwin, "Name", 0, namei)
+    nachname_entry = create_label_entry(popwin, "Nachname", 1, nachnamei)
+    geburtsdatum_entry = create_label_entry(popwin, "Geburtsdatum", 2, geburtsdatumi)
+    sterbedatum_entry = create_label_entry(popwin, "Sterbedatum", 3, sterbedatumi)
+
+    # Button-Funktion
+    def on_fertig_click():
+        nonlocal name, nachname, geburtsdatum, sterbedatum
+        name = name_entry.get()
+        nachname = nachname_entry.get()
+        geburtsdatum = geburtsdatum_entry.get()
+        sterbedatum = sterbedatum_entry.get()
+        popwin.destroy()
+
+    # Button hinzufügen
+    fertig_button = tk.Button(
+        popwin,
+        text="Fertig",
+        bg="#D5A77C",
+        fg="white",
+        font=("Helvetica", 12, "bold"),
+        relief="flat",
+        command=on_fertig_click
+    )
+    fertig_button.grid(row=4, column=0, columnspan=2, pady=20)
+
+
+    popwin.mainloop()
+
+    return name, nachname, geburtsdatum, sterbedatum
 
 if __name__ == "__main__":
     p: Parser = Parser()
