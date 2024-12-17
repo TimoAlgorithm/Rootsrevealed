@@ -1,3 +1,4 @@
+import os.path
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
@@ -289,31 +290,17 @@ class DisplayFrame(tk.Frame):
             except Exception as e:
                 messagebox.showerror("Fehler", f"Fehler beim Exportieren: {e}")
 
-    def collect_tree_data(self):
-        """Sammelt die Baumstruktur-Daten rekursiv und bereitet sie für den Export vor."""
-        data = []
-
-        def traverse_tree(person, parent_name=""):
-            """Hilfsfunktion zum Durchlaufen des Baumes."""
-            if isinstance(person, IndividualElement):
-                name = person.get_name()
-                children = self.controller.parser.get_children(person)
-                data.append([name, parent_name, "Ja" if children else "Nein", ""])
-                for child in children:
-                    traverse_tree(child, parent_name=name)
-
-        # Starte beim Wurzelelement
-        elements = self.controller.parser.get_root_child_elements()
-        eldest = [element for element in elements
-                if isinstance(element, IndividualElement) and not element.is_child_in_a_family()]
-        if eldest:
-            traverse_tree(eldest[0])
-
-        return data
-
     def save_data(self):
         """Speichert die aktuellen Änderungen."""
-        messagebox.showinfo("Speichern", "Daten wurden erfolgreich gespeichert.")
+        file_path = filedialog.asksaveasfilename(
+            title="Speichern",
+            defaultextension=".ged",
+            filetypes=[("GEDCOM-Dateien", "*.ged"), ("Alle Dateien", "*.*")]
+        )
+        if file_path:
+            with open(file_path, "w+", encoding="utf-8") as file:
+                self.controller.parser.save_gedcom(file)
+                messagebox.showinfo("Speichern", "Daten wurden erfolgreich gespeichert.")
 
     def zoom_in(self):
         """Zoomt in die Ansicht hinein und passt die Schriftgröße an."""
