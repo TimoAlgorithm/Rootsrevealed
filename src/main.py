@@ -4,7 +4,7 @@ from PIL import Image, ImageTk
 from python_gedcom_2.parser import Parser
 from python_gedcom_2.element.individual import IndividualElement
 import tkinter.font as tkFont
-
+import csv
 
 class MainWindow(tk.Tk):
     def __init__(self, parser: Parser, *args, **kwargs):
@@ -111,19 +111,28 @@ class DisplayFrame(tk.Frame):
     def __init__(self, parent: tk.Frame, controller: MainWindow):
         super().__init__(parent, bg="#36312D")
         self.controller = controller
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
+
+        # Menüleiste erstellen
+        self.create_menu_bar()
+
+        # Container für Baumstruktur
         self.container = tk.Frame(self, bg="#36312D")
-        self.container.grid(row=0, column=0, sticky='nsew')
+        self.container.pack(fill="both", expand=True)
         self.container.grid_rowconfigure(0, weight=1)
         self.container.grid_columnconfigure(0, weight=1)
+
+        # Canvas für Baum
         self.canvas = tk.Canvas(self.container, bg="#36312D", highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky='nsew')
+
+        # Scrollbars
         self.vbar = tk.Scrollbar(self.container, orient='vertical', command=self.canvas.yview)
         self.vbar.grid(row=0, column=1, sticky='ns')
         self.hbar = tk.Scrollbar(self.container, orient='horizontal', command=self.canvas.xview)
         self.hbar.grid(row=1, column=0, sticky='ew')
         self.canvas.configure(xscrollcommand=self.hbar.set, yscrollcommand=self.vbar.set)
+
+        # Baum zeichnen
         self.horizontal_gap = 30
         self.vertical_gap = 80
         self.vertical_padding = 10
@@ -138,6 +147,181 @@ class DisplayFrame(tk.Frame):
             self.draw_tree(eldest[0], start_x, start_y)
             self.canvas.update_idletasks()
             self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+    def create_menu_bar(self):
+        """Erstellt eine horizontale Menüleiste mit einem Logo und Buttons, die unterschiedlich groß sind."""
+        # Menüleiste erstellen
+        menu_bar = tk.Frame(self, bg="#2F2A25", height=70)
+        menu_bar.pack(side="top", fill="x")
+
+        # Spaltenkonfiguration für flexible Verteilung
+        menu_bar.grid_columnconfigure(0, weight=0)  # Logo-Spalte
+        for i in range(1, 6):  # Buttons-Spalten (4 Buttons + 1 Platzhalter)
+            menu_bar.grid_columnconfigure(i, weight=1)
+
+        # Logo hinzufügen
+        try:
+            logo_image = Image.open("images/logo.png").resize((60, 60), Image.Resampling.LANCZOS)
+            self.logo_photo = ImageTk.PhotoImage(logo_image)
+            logo_label = tk.Label(menu_bar, image=self.logo_photo, bg="#2F2A25")
+            logo_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        except Exception as e:
+            print(f"Fehler beim Laden des Logos: {e}")
+            logo_label = tk.Label(menu_bar, text="Logo", bg="#2F2A25", fg="white", font=("Arial", 12, "bold"))
+            logo_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
+
+        # Buttons hinzufügen mit unterschiedlichen Größen
+        self.button_images = []
+        button_paths_and_sizes = [
+            ("images/Exportieren.png", (60, 60)),
+            ("images/Speichern.png", (60, 60)),   
+            ("images/Zoom in.png", (50, 50)),  
+            ("images/Zoom out.png", (50,50)),
+            ("images/Suche ohne Text.png", (250, 75))    
+        ]
+
+        for path, size in button_paths_and_sizes:
+            try:
+                image = Image.open(path).resize(size, Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(image)
+                self.button_images.append((photo, size))
+            except Exception as e:
+                print(f"Fehler beim Laden des Bildes {path}: {e}")
+                self.button_images.append((None, size))
+
+        # Buttons erstellen und platzieren
+        for i, (img, size) in enumerate(self.button_images):
+            if img:
+                btn = tk.Button(menu_bar, image=img, bg="#2F2A25", bd=0, highlightthickness=0,
+                                command=lambda i=i: self.on_menu_button_click(i))
+            else:
+                btn = tk.Button(menu_bar, text=f"Button {i+1}", bg="#2F2A25", fg="white",
+                                command=lambda i=i: self.on_menu_button_click(i))
+
+            # Button in der entsprechenden Spalte platzieren
+            btn.grid(row=0, column=i + 1, padx=10, pady=5, sticky="nsew")
+            btn.config(width=size[0] // 10, height=size[1] // 10)  # Größe der Buttons anpassen
+
+        # Platzhalter-Spalte am rechten Rand hinzufügen
+        menu_bar.grid_columnconfigure(len(self.button_images) + 1, weight=2)
+
+
+
+    def on_menu_button_click(self, index):
+        """Wird aufgerufen, wenn ein Button in der Menüleiste geklickt wird."""
+        if index == 0:
+            self.export_data()
+        elif index == 1:
+            self.save_data()
+        elif index == 2:
+            self.zoom_in()
+        elif index == 3:
+            self.zoom_out()
+        elif index == 4:
+            self.search_person()
+
+    def export_data(self):
+        """Exportiert die aktuellen Daten als CSV-Datei."""
+        file_path = filedialog.asksaveasfilename(
+            title="Exportiere die Daten",
+            defaultextension=".csv",
+            filetypes=[("CSV-Dateien", "*.csv"), ("Alle Dateien", "*.*")]
+        )
+        if file_path:
+            try:
+                # Daten aus dem Parser sammeln
+                data = self.collect_tree_data()
+                
+                # CSV-Datei schreiben
+                with open(file_path, mode="w", newline="", encoding="utf-8") as csv_file:
+                    writer = csv.writer(csv_file)
+                    
+                    # Header schreiben
+                    writer.writerow(["Name", "Elternteil", "Kind", "Weitere Informationen"])
+                    
+                    # Daten schreiben
+                    for row in data:
+                        writer.writerow(row)
+                
+                messagebox.showinfo("Exportieren", f"Datei erfolgreich exportiert nach {file_path}")
+            except Exception as e:
+                messagebox.showerror("Fehler", f"Fehler beim Exportieren: {e}")
+
+    def collect_tree_data(self):
+        """Sammelt die Baumstruktur-Daten rekursiv und bereitet sie für den Export vor."""
+        data = []
+
+        def traverse_tree(person, parent_name=""):
+            """Hilfsfunktion zum Durchlaufen des Baumes."""
+            if isinstance(person, IndividualElement):
+                name = person.get_name()
+                children = self.controller.parser.get_children(person)
+                data.append([name, parent_name, "Ja" if children else "Nein", ""])
+                for child in children:
+                    traverse_tree(child, parent_name=name)
+        
+        # Starte beim Wurzelelement
+        elements = self.controller.parser.get_root_child_elements()
+        eldest = [element for element in elements
+                if isinstance(element, IndividualElement) and not element.is_child_in_a_family()]
+        if eldest:
+            traverse_tree(eldest[0])
+        
+        return data
+
+    def save_data(self):
+        """Speichert die aktuellen Änderungen."""
+        messagebox.showinfo("Speichern", "Daten wurden erfolgreich gespeichert.")
+
+    def zoom_in(self):
+        """Zoomt in die Ansicht hinein und passt die Schriftgröße an."""
+        scale_factor = 1.2
+        self.canvas.scale("all", 0, 0, scale_factor, scale_factor)
+        self.update_font_size(scale_factor)
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def zoom_out(self):
+        """Zoomt aus der Ansicht heraus und passt die Schriftgröße an."""
+        scale_factor = 0.8
+        self.canvas.scale("all", 0, 0, scale_factor, scale_factor)
+        self.update_font_size(scale_factor)
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def update_font_size(self, scale_factor):
+        """Passt die Schriftgröße basierend auf dem Zoom-Faktor an."""
+        current_size = self.font['size']
+        new_size = max(8, int(current_size * scale_factor))  # Mindestgröße der Schrift = 8
+        self.font.configure(size=new_size)
+
+
+    def search_person(self):
+        """Öffnet ein Suchfenster, um nach Personen zu suchen."""
+        search_window = tk.Toplevel(self)
+        search_window.title("Person suchen")
+        search_window.geometry("300x150")
+        search_window.config(bg="#2F2A25")
+
+        tk.Label(search_window, text="Name der Person:", bg="#2F2A25", fg="white").pack(pady=10)
+        search_entry = tk.Entry(search_window)
+        search_entry.pack(pady=5)
+
+    def perform_search():
+        search_name = search_entry.get().strip()
+        if not search_name:
+            messagebox.showwarning("Suche", "Bitte gib einen Namen ein.")
+            return
+
+        # Suche nach der Person in der GEDCOM-Datenstruktur
+        found = False
+        for person in self.controller.parser.get_root_child_elements():
+            if isinstance(person, IndividualElement) and search_name.lower() in person.get_name().lower():
+                messagebox.showinfo("Person gefunden", f"Person gefunden: {person.get_name()}")
+                found = True
+                break
+        if not found:
+            messagebox.showinfo("Nicht gefunden", "Keine Person mit diesem Namen gefunden.")
+
+        tk.Button(search_window, text="Suchen", command=perform_search, bg="#BF9874", fg="white").pack(pady=10)
 
     def get_node_dimensions(self, person: IndividualElement):
         name = person.get_name()
