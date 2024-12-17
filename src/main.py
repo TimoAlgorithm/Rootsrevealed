@@ -132,6 +132,11 @@ class DisplayFrame(tk.Frame):
         elements = self.controller.parser.get_root_child_elements()
         eldest = [element for element in elements
                   if isinstance(element, IndividualElement) and not element.is_child_in_a_family()]
+        
+        self.canvas.bind('<Button-1>', self.object_click_event)
+        
+        self.objects: dict[int, str] = {}
+        
         if eldest:
             start_x = 1000
             start_y = 50
@@ -161,11 +166,20 @@ class DisplayFrame(tk.Frame):
         y1 = y
         x2 = x + node_width / 2
         y2 = y + node_height
-        self.canvas.create_rectangle(x1, y1, x2, y2, fill="#7D625B", outline="#E9E4E1")
-        self.canvas.create_text(x, y + node_height / 2, text=person.get_name(), fill="#ffffff", font=self.font)
+        rect = self.canvas.create_rectangle(x1, y1, x2, y2, fill="#7D625B", outline="#E9E4E1")
+        text = self.canvas.create_text(x, y + node_height / 2, text=person.get_name(), fill="#ffffff", font=self.font)
+        self.objects[rect] = person.get_pointer()
+        self.objects[text] = person.get_pointer()
+        
+        #self.canvas.tag_bind(rect, "<Button-1>", self.object_click_event)
+        #self.canvas.tag_bind(text, "<Button-1>", self.object_click_event)
+        print(person.get_pointer(), rect, text)
+        
         children = self.controller.parser.get_children(person)
+        
         if not children:
             return
+        
         children_widths = [self.subtree_width(child) for child in children]
         total_children_width = sum(children_widths) + self.horizontal_gap * (len(children) - 1)
         child_top_y = y + node_height + self.vertical_gap
@@ -180,6 +194,11 @@ class DisplayFrame(tk.Frame):
             self.canvas.create_line(child_x, mid_y, child_x, child_y, fill="#A48164")
             self.draw_tree(child, child_x, child_y)
             start_x += cw + self.horizontal_gap
+
+    def object_click_event(self, event):
+        item = self.canvas.find
+        person = self.controller.parser.get_element_by_pointer(self.objects[event.num])
+        print(f"Clicked object {person} {type(person)} {person}")
 
 
 if __name__ == "__main__":
