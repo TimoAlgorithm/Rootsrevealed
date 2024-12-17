@@ -210,7 +210,7 @@ def popup_window(namei="", nachnamei="", geburtsdatumi="", sterbedatumi=""):
     geburtsdatum_entry = create_label_entry(popwin, "Geburtsdatum", 2, geburtsdatumi)
     sterbedatum_entry = create_label_entry(popwin, "Sterbedatum", 3, sterbedatumi)
 
-    # Button-Funktion
+    # Button-Funktion lol
     def on_fertig_click():
         nonlocal name, nachname, geburtsdatum, sterbedatum
         name = name_entry.get()
