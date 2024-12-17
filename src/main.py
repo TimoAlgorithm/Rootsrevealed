@@ -200,10 +200,10 @@ class DisplayFrame(tk.Frame):
         for i, (img, size) in enumerate(self.button_images):
             if img:
                 btn = tk.Button(menu_bar, image=img, bg="#2F2A25", bd=0, highlightthickness=0,
-                                command=lambda i=i: self.on_menu_button_click(i))
+                                command=lambda j=i: self.on_menu_button_click(j))
             else:
                 btn = tk.Button(menu_bar, text=f"Button {i+1}", bg="#2F2A25", fg="white",
-                                command=lambda i=i: self.on_menu_button_click(i))
+                                command=lambda j=i: self.on_menu_button_click(j))
 
             # Button in der entsprechenden Spalte platzieren
             btn.grid(row=0, column=i + 1, padx=10, pady=5, sticky="nsew")
@@ -236,19 +236,54 @@ class DisplayFrame(tk.Frame):
         )
         if file_path:
             try:
-                # Daten aus dem Parser sammeln
-                data = self.collect_tree_data()
+                invid = []
+                for element in self.controller.parser.get_root_child_elements():
+                    if isinstance(element,IndividualElement):
+                        invid.append(element)
 
-                # CSV-Datei schreiben
-                with open(file_path, mode="w", newline="", encoding="utf-8") as csv_file:
-                    writer = csv.writer(csv_file)
+                data = []
+                for i in invid:
+                    if i.get_birth_element():
+                        if i.get_birth_element().has_date():
+                            birt = i.get_birth_element().get_date_element().get_value()
+                        else:
+                            birt = None
+                    else:
+                        birt = None
+                    if i.get_death_element():
+                        if i.get_death_element().has_date():
+                            deat = i.get_death_element().get_date_element().get_value()
+                        else:
+                            deat = None
+                    else:
+                        deat = None
+                    children = self.controller.parser.get_children(i)
+                    child_names = ""
+                    for child in children:
+                        child_names += child.get_name() +"; "
+                    child_names = child_names[:-2]
+                    parents = self.controller.parser.get_parents(i)
+                    parent_str = ""
+                    for parent in parents:
+                        if parent:
+                            parent_str += parent.get_name() + "; "
+                    parent_str = parent_str[:-2]
+                    data.append([i.get_name(), i.get_gender(), i.get_occupation(), birt, deat, child_names, parent_str])
 
-                    # Header schreiben
-                    writer.writerow(["Name", "Elternteil", "Kind", "Weitere Informationen"])
+                data_dicts = [dict(zip(["Name", "Gender", "Arbeit", "Geburt", "Tod", "Kinder", "Eltern (V,M)"], row)) for row in data]
+                with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+                    csvwriter = csv.DictWriter(
+                        csvfile,
+                        fieldnames=["Name", "Gender", "Arbeit", "Geburt", "Tod", "Kinder", "Eltern (V,M)"],
+                        delimiter=',',
+                        quotechar='"',
+                        quoting=csv.QUOTE_MINIMAL
+                    )
+                    # Write header row
+                    csvwriter.writeheader()
 
-                    # Daten schreiben
-                    for row in data:
-                        writer.writerow(row)
+                    # Write data rows
+                    csvwriter.writerows(data_dicts)
 
                 messagebox.showinfo("Exportieren", f"Datei erfolgreich exportiert nach {file_path}")
             except Exception as e:
@@ -311,24 +346,6 @@ class DisplayFrame(tk.Frame):
         tk.Label(search_window, text="Name der Person:", bg="#2F2A25", fg="white").pack(pady=10)
         search_entry = tk.Entry(search_window)
         search_entry.pack(pady=5)
-
-    def perform_search():
-        search_name = search_entry.get().strip()
-        if not search_name:
-            messagebox.showwarning("Suche", "Bitte gib einen Namen ein.")
-            return
-
-        # Suche nach der Person in der GEDCOM-Datenstruktur
-        found = False
-        for person in self.controller.parser.get_root_child_elements():
-            if isinstance(person, IndividualElement) and search_name.lower() in person.get_name().lower():
-                messagebox.showinfo("Person gefunden", f"Person gefunden: {person.get_name()}")
-                found = True
-                break
-        if not found:
-            messagebox.showinfo("Nicht gefunden", "Keine Person mit diesem Namen gefunden.")
-
-        tk.Button(search_window, text="Suchen", command=perform_search, bg="#BF9874", fg="white").pack(pady=10)
 
     def get_node_dimensions(self, person: IndividualElement):
         name = person.get_name()
