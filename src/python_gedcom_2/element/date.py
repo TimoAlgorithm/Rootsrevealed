@@ -14,7 +14,7 @@ RETURN_SECOND_DATE = "second"
 
 period_prefixes: List[str] = ["FROM", "TO"]
 
-approximate_prefixes: List[str]  = ["ABT", "CAL", "EST"]
+approximate_prefixes: List[str]  = ["ABT", "CAL", "EST", "INT"]
 
 range_prefixes: List[str]  = ["BET", "AFT", "BEF"]
 
@@ -80,5 +80,9 @@ class DateElement(Element):
         elif date_len == 1:
             d = datetime.strptime(value.strip(), "%Y")
         else:
-            raise Exception(f"Malformed Date Value: {date_len} {value}")
+            if value.endswith(")"):
+                print(value.strip().split("(")[0])
+                return datetime.strptime(value.strip().split("(")[0].strip(), "%b %Y")
+            
+            raise Exception(f"Malformed Date Value with len {date_len}: {value}")
         return d
