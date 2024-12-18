@@ -3,7 +3,6 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 from python_gedcom_2.parser import Parser
 from python_gedcom_2.element.individual import IndividualElement
-import python_gedcom_2.tags as tags
 import tkinter.font as tkFont
 from python_gedcom_2.element.element import Element
 
@@ -14,6 +13,7 @@ class MainWindow(tk.Tk):
     def __init__(self, parser: Parser, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.parser = parser
+        self.current_frame: tk.Frame | None = None
         self.config(bg="#36312D")
         self.container = tk.Frame(self, bg="#36312D")
         self.container.pack(fill="both", expand=True)
@@ -26,6 +26,7 @@ class MainWindow(tk.Tk):
             widget.destroy()
         frame = frame_class(self.container, self, *args, **kwargs)
         frame.grid(row=0, column=0, sticky="nsew")
+        self.current_frame = frame
         frame.tkraise()
 
 
@@ -115,7 +116,7 @@ class DisplayFrame(tk.Frame):
     def __init__(self, parent: tk.Frame, controller: MainWindow, start_person_name: str = None):
         super().__init__(parent, bg="#36312D")
         self.controller = controller
-
+        self.start_person_name = start_person_name
         self.create_menu_bar()
 
         self.container = tk.Frame(self, bg="#36312D")
@@ -150,6 +151,7 @@ class DisplayFrame(tk.Frame):
             self.draw_tree(start[0], 1000, 50)
         elif eldest:
             self.draw_tree(eldest[0], 1000, 50)
+            self.start_person_name = eldest[0].get_name()
 
         self.canvas.update_idletasks()
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
@@ -391,6 +393,7 @@ class SearchWindow:
             selected_name = self.suggestion_list.get(selected_index[0])
             self.controller.show_frame(DisplayFrame, start_person_name = selected_name)
 
+
 class EditPopup(tk.Toplevel):
     def __init__(self, person: IndividualElement, controller: MainWindow):
         super().__init__()
@@ -427,7 +430,7 @@ class EditPopup(tk.Toplevel):
         self.text = tk.Label(self, text=self.person.to_gedcom_string(True), anchor="w", justify="left")
         self.text.grid(row=0, column=2, rowspan=i, padx=20, pady=10, sticky="nsew")
 
-    def create_label_entry(self, text, row, labeltext):
+    def create_label_entry(self, text, row, labeltext) -> tk.Entry:
         label = tk.Label(self, text=labeltext, bg="#7A534D", fg="white", font=("Helvetica", 12, "bold"))
         label.grid(row=row, column=0, padx=20, sticky="w")
         entry = tk.Entry(self, font=("Helvetica", 12), bg="#B38B82", fg="black", relief="flat")
@@ -444,8 +447,8 @@ class EditPopup(tk.Toplevel):
                 element.set_value(entry.get())
                 changed = True
 
-        if changed:
-            self.controller.show_frame(DisplayFrame)
+        if changed and isinstance(self.controller.current_frame, DisplayFrame):
+            self.controller.show_frame(DisplayFrame, start_person_name=self.controller.current_frame.start_person_name)
         self.destroy()
 
 
