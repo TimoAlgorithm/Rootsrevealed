@@ -21,10 +21,10 @@ class MainWindow(tk.Tk):
         self.container.grid_columnconfigure(0, weight=1)
         self.show_frame(SelectorFrame)
 
-    def show_frame(self, frame_class) -> None:
+    def show_frame(self, frame_class, *args, **kwargs) -> None:
         for widget in self.container.winfo_children():
             widget.destroy()
-        frame = frame_class(self.container, self)
+        frame = frame_class(self.container, self, *args, **kwargs)
         frame.grid(row=0, column=0, sticky="nsew")
         frame.tkraise()
 
@@ -112,108 +112,78 @@ class SelectorFrame(tk.Frame):
 
 
 class DisplayFrame(tk.Frame):
-    def __init__(self, parent: tk.Frame, controller: MainWindow):
+    def __init__(self, parent: tk.Frame, controller: MainWindow, start_person_name: str = None):
         super().__init__(parent, bg="#36312D")
         self.controller = controller
 
-        # Menüleiste erstellen
         self.create_menu_bar()
 
-        # Container für Baumstruktur
         self.container = tk.Frame(self, bg="#36312D")
         self.container.pack(fill="both", expand=True)
         self.container.grid_rowconfigure(0, weight=1)
         self.container.grid_columnconfigure(0, weight=1)
 
-        # Canvas für Baum
         self.canvas = tk.Canvas(self.container, bg="#36312D", highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky='nsew')
 
-        # Scrollbars
         self.vbar = tk.Scrollbar(self.container, orient='vertical', command=self.canvas.yview)
         self.vbar.grid(row=0, column=1, sticky='ns')
         self.hbar = tk.Scrollbar(self.container, orient='horizontal', command=self.canvas.xview)
         self.hbar.grid(row=1, column=0, sticky='ew')
         self.canvas.configure(xscrollcommand=self.hbar.set, yscrollcommand=self.vbar.set)
 
-        # Baum zeichnen
         self.horizontal_gap = 30
         self.vertical_gap = 80
         self.vertical_padding = 10
         self.horizontal_padding = 20
         self.font = tkFont.Font(family="Arial", size=12, weight="normal")
+        self.objects = {}
+
         elements = self.controller.parser.get_root_child_elements()
-        eldest = [element for element in elements
-                  if isinstance(element, IndividualElement) and not element.is_child_in_a_family()]
+        eldest = [
+            element for element in elements
+            if isinstance(element, IndividualElement) and not element.is_child_in_a_family()
+        ]
+        start = [element for element in self.controller.parser.get_root_child_elements() if isinstance(element, IndividualElement) and element.get_name() == start_person_name]
 
-        self.last_clicked: str = ""
-        self.objects: dict[int, str] = {}
+        if start_person_name is not None and start is not None:
+            self.draw_tree(start[0], 1000, 50)
+        elif eldest:
+            self.draw_tree(eldest[0], 1000, 50)
 
-        if eldest:
-            start_x = 1000
-            start_y = 50
-            self.draw_tree(eldest[0], start_x, start_y)
-            self.canvas.update_idletasks()
-            self.canvas.config(scrollregion=self.canvas.bbox("all"))
+        self.canvas.update_idletasks()
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
     def create_menu_bar(self):
         """Erstellt eine horizontale Menüleiste mit einem Logo und Buttons, die unterschiedlich groß sind."""
-        # Menüleiste erstellen
         menu_bar = tk.Frame(self, bg="#2F2A25", height=70)
-        menu_bar.pack(side="top", fill="x")
+        menu_bar.pack(side="top", fill="x", pady=5, padx=10)
 
-        # Spaltenkonfiguration für flexible Verteilung
-        menu_bar.grid_columnconfigure(0, weight=0)  # Logo-Spalte
-        for i in range(1, 6):  # Buttons-Spalten (4 Buttons + 1 Platzhalter)
-            menu_bar.grid_columnconfigure(i, weight=1)
+        menu_bar.grid_columnconfigure(0, weight=1)
+        menu_bar.grid_columnconfigure(1, weight=1)
+        menu_bar.grid_columnconfigure(2, weight=1)
+        menu_bar.grid_columnconfigure(3, weight=2)
 
-        # Logo hinzufügen
-        try:
-            logo_image = Image.open("images/logo.png").resize((60, 60), Image.Resampling.LANCZOS)
-            self.logo_photo = ImageTk.PhotoImage(logo_image)
-            logo_label = tk.Label(menu_bar, image=self.logo_photo, bg="#2F2A25")
-            logo_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        except Exception as e:
-            print(f"Fehler beim Laden des Logos: {e}")
-            logo_label = tk.Label(menu_bar, text="Logo", bg="#2F2A25", fg="white", font=("Arial", 12, "bold"))
-            logo_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        logo_image = Image.open("images/logo.png").resize((60, 60), Image.Resampling.LANCZOS)
+        self.logo_photo = ImageTk.PhotoImage(logo_image)
+        logo_label = tk.Label(menu_bar, image=self.logo_photo, bg="#2F2A25")
+        logo_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
 
-        # Buttons hinzufügen mit unterschiedlichen Größen
-        self.button_images = []
-        button_paths_and_sizes = [
-            ("images/Exportieren.png", (60, 60)),
-            ("images/Speichern.png", (60, 60)),
-            ("images/Zoom in.png", (50, 50)),
-            ("images/Zoom out.png", (50,50)),
-            ("images/Suche ohne Text.png", (250, 75))
+        button_config = [
+            {"image_path": "images/Exportieren.png", "command": self.export_data, "size": (60, 60)},
+            {"image_path": "images/Speichern.png", "command": self.save_data, "size": (60, 60)},
+            #{"image_path": "images/Zoom in.png", "command": self.zoom_in, "size": (50, 50)},
+            #{"image_path": "images/Zoom out.png", "command": self.zoom_out, "size": (50, 50)},
+            {"image_path": "images/Lupe.png", "command": self.search_person, "size": (60, 47)},
         ]
 
-        for path, size in button_paths_and_sizes:
-            try:
-                image = Image.open(path).resize(size, Image.Resampling.LANCZOS)
-                photo = ImageTk.PhotoImage(image)
-                self.button_images.append((photo, size))
-            except Exception as e:
-                print(f"Fehler beim Laden des Bildes {path}: {e}")
-                self.button_images.append((None, size))
-
-        # Buttons erstellen und platzieren
-        for i, (img, size) in enumerate(self.button_images):
-            if img:
-                btn = tk.Button(menu_bar, image=img, bg="#2F2A25", bd=0, highlightthickness=0,
-                                command=lambda j=i: self.on_menu_button_click(j))
-            else:
-                btn = tk.Button(menu_bar, text=f"Button {i+1}", bg="#2F2A25", fg="white",
-                                command=lambda j=i: self.on_menu_button_click(j))
-
-            # Button in der entsprechenden Spalte platzieren
-            btn.grid(row=0, column=i + 1, padx=10, pady=5, sticky="nsew")
-            btn.config(width=size[0] // 10, height=size[1] // 10)  # Größe der Buttons anpassen
-
-        # Platzhalter-Spalte am rechten Rand hinzufügen
-        menu_bar.grid_columnconfigure(len(self.button_images) + 1, weight=2)
-
-
+        for i, config in enumerate(button_config):
+            button_image = Image.open(config["image_path"]).resize(config["size"], Image.Resampling.LANCZOS)
+            button_photo = ImageTk.PhotoImage(button_image)
+            button = tk.Button(menu_bar, image=button_photo, bg="#2F2A25", bd=0, highlightthickness=0,
+                               command=config["command"])
+            button.image = button_photo
+            button.grid(row=0, column=i+1, padx=10, pady=5, sticky="nsew")
 
     def on_menu_button_click(self, index):
         """Wird aufgerufen, wenn ein Button in der Menüleiste geklickt wird."""
@@ -280,10 +250,8 @@ class DisplayFrame(tk.Frame):
                         quotechar='"',
                         quoting=csv.QUOTE_MINIMAL
                     )
-                    # Write header row
                     csvwriter.writeheader()
 
-                    # Write data rows
                     csvwriter.writerows(data_dicts)
 
                 messagebox.showinfo("Exportieren", f"Datei erfolgreich exportiert nach {file_path}")
@@ -297,7 +265,7 @@ class DisplayFrame(tk.Frame):
             defaultextension=".ged",
             filetypes=[("GEDCOM-Dateien", "*.ged"), ("Alle Dateien", "*.*")]
         )
-        if file_path:
+        if file_path and file_path.endswith(".ged"):
             with open(file_path, "w+", encoding="utf-8") as file:
                 self.controller.parser.save_gedcom(file)
                 messagebox.showinfo("Speichern", "Daten wurden erfolgreich gespeichert.")
@@ -325,14 +293,7 @@ class DisplayFrame(tk.Frame):
 
     def search_person(self):
         """Öffnet ein Suchfenster, um nach Personen zu suchen."""
-        search_window = tk.Toplevel(self)
-        search_window.title("Person suchen")
-        search_window.geometry("300x150")
-        search_window.config(bg="#2F2A25")
-
-        tk.Label(search_window, text="Name der Person:", bg="#2F2A25", fg="white").pack(pady=10)
-        search_entry = tk.Entry(search_window)
-        search_entry.pack(pady=5)
+        SearchWindow(self, self.controller)
 
     def get_node_dimensions(self, person: IndividualElement):
         name = person.get_name()
@@ -391,6 +352,45 @@ class DisplayFrame(tk.Frame):
             EditPopup(person, self.controller).mainloop()
 
 
+class SearchWindow:
+    def __init__(self, parent, controller: MainWindow):
+        self.parent = parent
+        self.controller = controller
+        self.parser = controller.parser
+
+        self.window = tk.Toplevel(self.parent)
+        self.window.title("Person suchen")
+        self.window.geometry("300x200")
+        self.window.config(bg="#2F2A25")
+
+        self.search_label = tk.Label(self.window, text="Name der Person:", bg="#2F2A25", fg="white")
+        self.search_label.pack(pady=5)
+
+        self.search_entry = tk.Entry(self.window)
+        self.search_entry.pack(pady=5)
+        self.search_entry.bind("<KeyRelease>", self.update_suggestions)
+
+        self.suggestion_list = tk.Listbox(self.window)
+        self.suggestion_list.pack(pady=5, fill=tk.BOTH, expand=True)
+        self.suggestion_list.bind("<<ListboxSelect>>", self.on_select)
+
+    def update_suggestions(self, event):
+        input_text = self.search_entry.get().lower()
+        self.suggestion_list.delete(0, tk.END)
+
+        if input_text:
+            for element in self.parser.get_element_list():
+                if isinstance(element, IndividualElement):
+                    name = element.get_name().lower()
+                    if input_text in name:
+                        self.suggestion_list.insert(tk.END, element.get_name())
+
+    def on_select(self, event):
+        selected_index = self.suggestion_list.curselection()
+        if selected_index:
+            selected_name = self.suggestion_list.get(selected_index[0])
+            self.controller.show_frame(DisplayFrame, start_person_name = selected_name)
+
 class EditPopup(tk.Tk):
     def __init__(self, person: IndividualElement, controller: MainWindow):
         super().__init__()
@@ -437,16 +437,19 @@ class EditPopup(tk.Tk):
         return entry
 
     def on_fertig_click(self):
+        changed = False
         new_name = self.given_name_entry.get()
         if new_name != self.given_name or self.nachname_entry.get() != self.nachname:
             name_element: Element = self.person.get_child_element_by_tag(tags.GEDCOM_TAG_NAME)
             name_element.get_child_element_by_tag(tags.GEDCOM_TAG_GIVEN_NAME).set_value(new_name)
-            name_element.get_child_element_by_tag(tags.GEDCOM_TAG_SURNAME).set_value(self.nachname_entry.get())
+            if self.nachname_entry.get() != self.nachname and name_element.is_tag_present(tags.GEDCOM_TAG_SURNAME):
+                name_element.get_child_element_by_tag(tags.GEDCOM_TAG_SURNAME).set_value(self.nachname_entry.get())
             name_element.set_value(new_name + " /" + self.nachname_entry.get() + "/")
-
+            changed = True
         # TODO: events und andere sachen editieren
 
-        self.controller.show_frame(DisplayFrame)
+        if changed:
+            self.controller.show_frame(DisplayFrame)
         self.destroy()
 
 
