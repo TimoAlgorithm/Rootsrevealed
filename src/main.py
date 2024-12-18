@@ -1,4 +1,3 @@
-import os.path
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
@@ -9,6 +8,7 @@ import tkinter.font as tkFont
 from python_gedcom_2.element.element import Element
 
 import csv
+
 
 class MainWindow(tk.Tk):
     def __init__(self, parser: Parser, *args, **kwargs):
@@ -157,7 +157,7 @@ class DisplayFrame(tk.Frame):
     def create_menu_bar(self):
         """Erstellt eine horizontale Menüleiste mit einem Logo und Buttons, die unterschiedlich groß sind."""
         menu_bar = tk.Frame(self, bg="#2F2A25", height=70)
-        menu_bar.pack(side="top", fill="x", pady=5, padx=10)
+        menu_bar.pack(side="top", fill="x")
 
         menu_bar.grid_columnconfigure(0, weight=1)
         menu_bar.grid_columnconfigure(1, weight=1)
@@ -349,7 +349,7 @@ class DisplayFrame(tk.Frame):
         if item_id in self.objects:
             pointer = self.objects[item_id]
             person = self.controller.parser.get_element_by_pointer(pointer)
-            EditPopup(person, self.controller).mainloop()
+            EditPopup(person, self.controller)
 
 
 class SearchWindow:
@@ -391,28 +391,27 @@ class SearchWindow:
             selected_name = self.suggestion_list.get(selected_index[0])
             self.controller.show_frame(DisplayFrame, start_person_name = selected_name)
 
-class EditPopup(tk.Tk):
+class EditPopup(tk.Toplevel):
     def __init__(self, person: IndividualElement, controller: MainWindow):
         super().__init__()
         self.controller = controller
         self.person = person
 
         self.title("Daten ändern")
-        #self.geometry("400x280")
-        self.resizable(False, False)
-        self.configure(bg="#7A534D")  # Hintergrundfarbe
+        self.configure(bg="#7A534D")
 
-        is_name_tag_present = person.is_tag_present(tags.GEDCOM_TAG_NAME)
+        self.entries: dict[Element, tk.Entry] = {}
 
-        self.given_name = person.get_name_as_tuple()[0] if is_name_tag_present else ""
-        self.nachname = person.get_name_as_tuple()[1] if is_name_tag_present else ""
-        self.geburtsdatum = person.get_birth_element().get_date_element().as_datetime() if person.get_birth_element() else ""
-        self.sterbedatum = person.get_death_element().get_date_element().as_datetime() if person.get_death_element() else ""
+        child_tags: list[Element] = person.get_child_elements().copy()
+        i = 1
+        while len(child_tags) > 0:
+            element = child_tags.pop(0)
+            if isinstance(element, Element):
+                self.entries[element] = self.create_label_entry(element.get_value(), i, element.get_tag())
+                for child in element.get_child_elements():
+                    child_tags.insert(0, child)
 
-        self.given_name_entry = self.create_label_entry("Name", 0, self.given_name)
-        self.nachname_entry = self.create_label_entry("Nachname", 1, self.nachname)
-        self.geburtsdatum_entry = self.create_label_entry("Geburtsdatum", 2, self.geburtsdatum)
-        self.sterbedatum_entry = self.create_label_entry("Sterbedatum", 3, self.sterbedatum)
+            i += 1
 
         fertig_button = tk.Button(
             self,
@@ -423,30 +422,27 @@ class EditPopup(tk.Tk):
             relief="flat",
             command=self.on_fertig_click
         )
-        fertig_button.grid(row=4, column=0, columnspan=2, pady=20)
+        fertig_button.grid(row=i, column=0, columnspan=2, pady=20)
 
-        text = tk.Label(self, text=self.person.to_gedcom_string(True), anchor="w", justify="left")
-        text.grid(row=0, column=2, rowspan=5, padx=20, pady=10, sticky="nsew")
+        self.text = tk.Label(self, text=self.person.to_gedcom_string(True), anchor="w", justify="left")
+        self.text.grid(row=0, column=2, rowspan=i, padx=20, pady=10, sticky="nsew")
 
     def create_label_entry(self, text, row, labeltext):
-        label = tk.Label(self, text=text, bg="#7A534D", fg="white", font=("Helvetica", 12, "bold"))
-        label.grid(row=row, column=0, padx=20, pady=10, sticky="w")
+        label = tk.Label(self, text=labeltext, bg="#7A534D", fg="white", font=("Helvetica", 12, "bold"))
+        label.grid(row=row, column=0, padx=20, sticky="w")
         entry = tk.Entry(self, font=("Helvetica", 12), bg="#B38B82", fg="black", relief="flat")
-        entry.insert(0, labeltext)
-        entry.grid(row=row, column=1, padx=20, pady=10)
+        if not text:
+            entry.config(state="disabled", bg="#57534F")
+        entry.insert(0, text)
+        entry.grid(row=row, column=1, padx=20)
         return entry
 
     def on_fertig_click(self):
         changed = False
-        new_name = self.given_name_entry.get()
-        if new_name != self.given_name or self.nachname_entry.get() != self.nachname:
-            name_element: Element = self.person.get_child_element_by_tag(tags.GEDCOM_TAG_NAME)
-            name_element.get_child_element_by_tag(tags.GEDCOM_TAG_GIVEN_NAME).set_value(new_name)
-            if self.nachname_entry.get() != self.nachname and name_element.is_tag_present(tags.GEDCOM_TAG_SURNAME):
-                name_element.get_child_element_by_tag(tags.GEDCOM_TAG_SURNAME).set_value(self.nachname_entry.get())
-            name_element.set_value(new_name + " /" + self.nachname_entry.get() + "/")
-            changed = True
-        # TODO: events und andere sachen editieren
+        for element, entry in self.entries.items():
+            if entry.get() != element.get_value():
+                element.set_value(entry.get())
+                changed = True
 
         if changed:
             self.controller.show_frame(DisplayFrame)
