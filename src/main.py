@@ -150,8 +150,9 @@ class DisplayFrame(tk.Frame):
         if start_person_name is not None and start is not None:
             self.draw_tree(start[0], 1000, 50)
         elif eldest:
-            self.draw_tree(eldest[0], 1000, 50)
-            self.start_person_name = eldest[0].get_name()
+            most_descendants = max(eldest, key=lambda x: len(self.controller.parser.get_descendants(x)))
+            self.draw_tree(most_descendants, 1000, 50)
+            self.start_person_name = most_descendants.get_name()
 
         self.canvas.update_idletasks()
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
